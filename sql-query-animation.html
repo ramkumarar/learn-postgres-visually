@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Query Execution Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .container {
+            width: 1600px;
+            height: 900px;
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .data-table {
+            position: absolute;
+            border: 2px solid #666;
+            border-radius: 8px;
+            background: #2a2a2a;
+            min-width: 180px;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.5s ease;
+        }
+
+        .data-table.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .data-table.current-step {
+            border-color: #4a7c59;
+            box-shadow: 0 0 20px rgba(74, 124, 89, 0.6);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 20px rgba(74, 124, 89, 0.6);
+            }
+            to {
+                box-shadow: 0 0 30px rgba(74, 124, 89, 0.9);
+            }
+        }
+
+        .table-header {
+            background: #333;
+            padding: 8px 12px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            border-bottom: 2px solid #666;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .table-body {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .table-row {
+            padding: 6px 8px;
+            border-bottom: 1px solid #444;
+            font-size: 10px;
+            display: flex;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .table-row span {
+            min-width: 60px;
+            text-align: left;
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .table-row.highlighted {
+            background: #4a7c59;
+            animation: pulse 1s ease-in-out;
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(74, 124, 89, 0.6);
+        }
+
+        .table-row.filtered-out {
+            opacity: 0.3;
+            text-decoration: line-through;
+            background: #444;
+            transition: all 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                background: #4a7c59; 
+                box-shadow: 0 0 15px rgba(74, 124, 89, 0.6);
+            }
+            50% { 
+                background: #5a8c69; 
+                box-shadow: 0 0 25px rgba(90, 140, 105, 0.8);
+            }
+        }
+
+        /* Table positions - Flow layout */
+        .customers-table { 
+            top: 100px; 
+            left: 50px; 
+            background: linear-gradient(145deg, #8B5A9F, #6B4A7F);
+        }
+
+        .orders-table { 
+            top: 100px; 
+            left: 300px; 
+            background: linear-gradient(145deg, #5A7A9F, #4A6A8F);
+        }
+
+        .joined-table { 
+            top: 100px; 
+            left: 620px; 
+            background: linear-gradient(145deg, #5A9F7A, #4A8F6A);
+        }
+
+        .filtered-table { 
+            top: 350px; 
+            left: 50px; 
+            background: linear-gradient(145deg, #9F8A5A, #8F7A4A);
+        }
+
+        .grouped-table { 
+            top: 350px; 
+            left: 380px; 
+            background: linear-gradient(145deg, #9F5A7A, #8F4A6A);
+        }
+
+        .having-table { 
+            top: 350px; 
+            left: 630px; 
+            background: linear-gradient(145deg, #7A5A9F, #6A4A8F);
+        }
+
+        .ordered-table { 
+            top: 600px; 
+            left: 250px; 
+            background: linear-gradient(145deg, #5A9F9F, #4A8F8F);
+        }
+
+        .final-table { 
+            top: 600px; 
+            left: 530px; 
+            background: linear-gradient(145deg, #9F9F5A, #8F8F4A);
+        }
+
+        .sql-box {
+            position: absolute;
+            right: 50px;
+            top: 80px;
+            width: 450px;
+            background: #2d4a3e;
+            border: 2px solid #4a7c59;
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .sql-line {
+            opacity: 0.3;
+            transition: all 0.5s ease;
+            margin: 6px 0;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .sql-line.active {
+            opacity: 1;
+            background: rgba(74, 124, 89, 0.4);
+            transform: scale(1.02);
+            box-shadow: 0 0 10px rgba(74, 124, 89, 0.3);
+        }
+
+        .keyword {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .connection {
+            position: absolute;
+            stroke: #00bcd4;
+            stroke-width: 3;
+            fill: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            marker-end: url(#arrowhead);
+            filter: drop-shadow(0 0 3px rgba(0, 188, 212, 0.5));
+        }
+
+        .connection.active {
+            opacity: 1;
+            animation: drawLine 1.2s ease-in-out;
+        }
+
+        @keyframes drawLine {
+            0% {
+                stroke-dasharray: 1000;
+                stroke-dashoffset: 1000;
+                opacity: 0;
+            }
+            20% {
+                opacity: 1;
+            }
+            100% {
+                stroke-dasharray: 1000;
+                stroke-dashoffset: 0;
+                opacity: 1;
+            }
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #4a7c59;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        button:hover:not(:disabled) {
+            background: #5a8c69;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+
+        button:disabled {
+            background: #333;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .step-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            font-weight: bold;
+            color: #4a7c59;
+            background: rgba(74, 124, 89, 0.1);
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: 2px solid #4a7c59;
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a7c59, #5a8c69);
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 3px;
+        }
+
+        .keyboard-help {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            color: #888;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        .notes-box {
+            position: absolute;
+            right: 50px;
+            top: 550px;
+            width: 400px;
+            background: #2d3748;
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .notes-title {
+            color: #63b3ed;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .execution-stages {
+            color: #e2e8f0;
+        }
+
+        .execution-stages .stage {
+            margin: 3px 0;
+            padding: 2px 0;
+        }
+
+        .execution-stages .stage-number {
+            color: #fbb6ce;
+            font-weight: bold;
+            display: inline-block;
+            width: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="step-indicator" id="stepIndicator">Step 1: FROM - Load Source Tables</div>
+        
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- Original Tables -->
+        <div class="data-table customers-table" id="customersTable">
+            <div class="table-header">customers</div>
+            <div class="table-body">
+                <div class="table-row"><span>id</span><span>name</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span></div>
+                <div class="table-row"><span>102</span><span>Bob</span></div>
+                <div class="table-row"><span>103</span><span>Carol</span></div>
+                <div class="table-row"><span>104</span><span>Dave</span></div>
+                <div class="table-row"><span>105</span><span>Eve</span></div>
+            </div>
+        </div>
+
+        <div class="data-table orders-table" id="ordersTable">
+            <div class="table-header">orders</div>
+            <div class="table-body">
+                <div class="table-row"><span>id</span><span>cust_id</span><span>date</span><span>amount</span></div>
+                <div class="table-row"><span>1</span><span>101</span><span>2023-02-15</span><span>250</span></div>
+                <div class="table-row"><span>2</span><span>102</span><span>2022-12-10</span><span>150</span></div>
+                <div class="table-row"><span>3</span><span>101</span><span>2023-03-20</span><span>400</span></div>
+                <div class="table-row"><span>4</span><span>103</span><span>2023-01-05</span><span>800</span></div>
+                <div class="table-row"><span>5</span><span>101</span><span>2023-04-10</span><span>300</span></div>
+                <div class="table-row"><span>6</span><span>104</span><span>2023-02-28</span><span>600</span></div>
+                <div class="table-row"><span>7</span><span>102</span><span>2023-01-15</span><span>200</span></div>
+                <div class="table-row"><span>8</span><span>105</span><span>2023-03-05</span><span>450</span></div>
+            </div>
+        </div>
+
+        <!-- Joined Table -->
+        <div class="data-table joined-table" id="joinedTable">
+            <div class="table-header">customers ⟗ orders</div>
+            <div class="table-body">
+                <div class="table-row"><span>cust_id</span><span>name</span><span>date</span><span>amount</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span><span>2023-02-15</span><span>250</span></div>
+                <div class="table-row"><span>102</span><span>Bob</span><span>2022-12-10</span><span>150</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span><span>2023-03-20</span><span>400</span></div>
+                <div class="table-row"><span>103</span><span>Carol</span><span>2023-01-05</span><span>800</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span><span>2023-04-10</span><span>300</span></div>
+                <div class="table-row"><span>104</span><span>Dave</span><span>2023-02-28</span><span>600</span></div>
+                <div class="table-row"><span>102</span><span>Bob</span><span>2023-01-15</span><span>200</span></div>
+                <div class="table-row"><span>105</span><span>Eve</span><span>2023-03-05</span><span>450</span></div>
+            </div>
+        </div>
+
+        <!-- Filtered Table -->
+        <div class="data-table filtered-table" id="filteredTable">
+            <div class="table-header">WHERE date >= '2023-01-01'</div>
+            <div class="table-body">
+                <div class="table-row"><span>cust_id</span><span>name</span><span>date</span><span>amount</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span><span>2023-02-15</span><span>250</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span><span>2023-03-20</span><span>400</span></div>
+                <div class="table-row"><span>103</span><span>Carol</span><span>2023-01-05</span><span>800</span></div>
+                <div class="table-row"><span>101</span><span>Alice</span><span>2023-04-10</span><span>300</span></div>
+                <div class="table-row"><span>104</span><span>Dave</span><span>2023-02-28</span><span>600</span></div>
+                <div class="table-row"><span>102</span><span>Bob</span><span>2023-01-15</span><span>200</span></div>
+                <div class="table-row"><span>105</span><span>Eve</span><span>2023-03-05</span><span>450</span></div>
+            </div>
+        </div>
+
+        <!-- Grouped Table -->
+        <div class="data-table grouped-table" id="groupedTable">
+            <div class="table-header">GROUP BY customer_id</div>
+            <div class="table-body">
+                <div class="table-row"><span>cust_id</span><span>orders</span><span>total</span></div>
+                <div class="table-row"><span>101</span><span>3</span><span>950</span></div>
+                <div class="table-row"><span>102</span><span>1</span><span>200</span></div>
+                <div class="table-row"><span>103</span><span>1</span><span>800</span></div>
+                <div class="table-row"><span>104</span><span>1</span><span>600</span></div>
+                <div class="table-row"><span>105</span><span>1</span><span>450</span></div>
+            </div>
+        </div>
+
+        <!-- Having Table -->
+        <div class="data-table having-table" id="havingTable">
+            <div class="table-header">HAVING total >= 600</div>
+            <div class="table-body">
+                <div class="table-row"><span>cust_id</span><span>orders</span><span>total</span></div>
+                <div class="table-row"><span>101</span><span>3</span><span>950</span></div>
+                <div class="table-row"><span>103</span><span>1</span><span>800</span></div>
+                <div class="table-row"><span>104</span><span>1</span><span>600</span></div>
+            </div>
+        </div>
+
+        <!-- Ordered Table -->
+        <div class="data-table ordered-table" id="orderedTable">
+            <div class="table-header">ORDER BY total DESC</div>
+            <div class="table-body">
+                <div class="table-row"><span>cust_id</span><span>orders</span><span>total</span></div>
+                <div class="table-row"><span>101</span><span>3</span><span>950</span></div>
+                <div class="table-row"><span>103</span><span>1</span><span>800</span></div>
+                <div class="table-row"><span>104</span><span>1</span><span>600</span></div>
+            </div>
+        </div>
+
+        <!-- Final Table -->
+        <div class="data-table final-table" id="finalTable">
+            <div class="table-header">LIMIT 3 - Final Result</div>
+            <div class="table-body">
+                <div class="table-row"><span>cust_id</span><span>orders</span><span>total</span></div>
+                <div class="table-row"><span>101</span><span>3</span><span>950</span></div>
+                <div class="table-row"><span>103</span><span>1</span><span>800</span></div>
+                <div class="table-row"><span>104</span><span>1</span><span>600</span></div>
+            </div>
+        </div>
+
+        <!-- SQL Query Box -->
+        <div class="sql-box">
+            <div class="sql-line" data-step="5"><span class="keyword">SELECT</span> customer_id, <span class="keyword">COUNT</span>(order_id) as total_orders,</div>
+            <div class="sql-line" data-step="5" style="margin-left: 20px;"><span class="keyword">SUM</span>(order_amount) as total_spent</div>
+            <div class="sql-line" data-step="1"><span class="keyword">FROM</span> customers</div>
+            <div class="sql-line" data-step="2"><span class="keyword">JOIN</span> orders</div>
+            <div class="sql-line" data-step="2"><span class="keyword">ON</span> customers.id = orders.customer_id</div>
+            <div class="sql-line" data-step="3"><span class="keyword">WHERE</span> ORDER_DATE >= '2023-01-01'</div>
+            <div class="sql-line" data-step="4"><span class="keyword">GROUP BY</span> customer_id</div>
+            <div class="sql-line" data-step="6"><span class="keyword">HAVING</span> total_spent >= 600</div>
+            <div class="sql-line" data-step="7"><span class="keyword">ORDER BY</span> total_spent <span class="keyword">DESC</span></div>
+            <div class="sql-line" data-step="8"><span class="keyword">LIMIT</span> 3;</div>
+        </div>
+
+        <!-- SVG for connections -->
+        <svg width="1600" height="900" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+            <defs>
+                <marker id="arrowhead" markerWidth="12" markerHeight="8" 
+                        refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
+                    <polygon points="0 0, 12 4, 0 8" fill="#00bcd4" />
+                </marker>
+            </defs>
+            
+            <!-- FROM customers to JOIN -->
+            <path class="connection" id="conn1" d="M 190 175 Q 405 175 620 175" />
+            <!-- FROM orders to JOIN -->  
+            <path class="connection" id="conn2" d="M 440 175 Q 530 175 620 175" />
+            <!-- JOIN to WHERE -->
+            <path class="connection" id="conn3" d="M 695 280 Q 420 315 190 350" />
+            <!-- WHERE to GROUP BY -->
+            <path class="connection" id="conn4" d="M 190 520 Q 285 470 380 425" />
+            <!-- GROUP BY to HAVING -->
+            <path class="connection" id="conn5" d="M 520 425 Q 575 425 630 425" />
+            <!-- HAVING to ORDER BY -->
+            <path class="connection" id="conn6" d="M 705 520 Q 480 560 390 600" />
+            <!-- ORDER BY to LIMIT -->
+            <path class="connection" id="conn7" d="M 390 675 Q 460 675 530 675" />
+            <!-- Final result arrow coming out of LIMIT -->
+            <path class="connection" id="conn8" d="M 670 675 L 750 675" />
+        </svg>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button onclick="previousStep()" id="prevBtn">← Previous</button>
+            <button onclick="nextStep()" id="nextBtn">Next →</button>
+            <button onclick="resetAnimation()">🔄 Reset</button>
+            <button onclick="toggleAutoPlay()" id="playBtn">▶️ Auto Play</button>
+        </div>
+        
+        <div class="keyboard-help">
+            <small>Keyboard: ← → arrows, Space (play/pause), R (reset)</small>
+        </div>
+
+        <!-- Notes Box -->
+        <div class="notes-box">
+            <div class="notes-title">📝 8 Stages of SQL Order of Execution</div>
+            <div class="execution-stages">
+                <div class="stage"><span class="stage-number">1.</span> FROM/JOIN - Load and combine tables</div>
+                <div class="stage"><span class="stage-number">2.</span> WHERE - Filter rows based on conditions</div>
+                <div class="stage"><span class="stage-number">3.</span> GROUP BY - Group rows by specified columns</div>
+                <div class="stage"><span class="stage-number">4.</span> HAVING - Filter groups based on conditions</div>
+                <div class="stage"><span class="stage-number">5.</span> SELECT - Choose columns and apply functions</div>
+                <div class="stage"><span class="stage-number">6.</span> DISTINCT - Remove duplicate rows</div>
+                <div class="stage"><span class="stage-number">7.</span> ORDER BY - Sort the result set</div>
+                <div class="stage"><span class="stage-number">8.</span> LIMIT/OFFSET - Limit number of returned rows</div>
+            </div>
+        </div>
+
+        <!-- Final Result Indicator -->
+        <div class="final-result" id="finalResult" style="
+            position: absolute;
+            top: 650px;
+            left: 760px;
+            background: linear-gradient(145deg, #FFD700, #FFA500);
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 12px;
+            color: #000;
+            opacity: 0;
+            transition: all 0.5s ease;
+        ">
+            📊 Final Result
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        const maxSteps = 8;
+        let autoPlaying = false;
+        let autoPlayInterval = null;
+
+        const stepDescriptions = {
+            0: "Ready to Start - Click Next or Play",
+            1: "Step 1/8: FROM - Load Source Tables",
+            2: "Step 2/8: JOIN - Combine Related Tables", 
+            3: "Step 3/8: WHERE - Filter Rows by Date",
+            4: "Step 4/8: GROUP BY - Aggregate by Customer",
+            5: "Step 5/8: SELECT - Choose Columns & Calculate",
+            6: "Step 6/8: HAVING - Filter Grouped Results (>= 600)",
+            7: "Step 7/8: ORDER BY - Sort by Total Spent DESC",
+            8: "Step 8/8: LIMIT - Get Top 3 Results"
+        };
+
+        const stepTables = {
+            1: ['customersTable', 'ordersTable'],
+            2: ['customersTable', 'ordersTable', 'joinedTable'],
+            3: ['customersTable', 'ordersTable', 'joinedTable', 'filteredTable'],
+            4: ['customersTable', 'ordersTable', 'joinedTable', 'filteredTable', 'groupedTable'],
+            5: ['customersTable', 'ordersTable', 'joinedTable', 'filteredTable', 'groupedTable'],
+            6: ['customersTable', 'ordersTable', 'joinedTable', 'filteredTable', 'groupedTable', 'havingTable'],
+            7: ['customersTable', 'ordersTable', 'joinedTable', 'filteredTable', 'groupedTable', 'havingTable', 'orderedTable'],
+            8: ['customersTable', 'ordersTable', 'joinedTable', 'filteredTable', 'groupedTable', 'havingTable', 'orderedTable', 'finalTable']
+        };
+
+        function updateStep(step) {
+            currentStep = step;
+            
+            // Update progress bar
+            const progress = (step / maxSteps) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+            
+            // Update step indicator
+            document.getElementById('stepIndicator').textContent = stepDescriptions[step] || "Ready to Start";
+            
+            // Reset all elements
+            document.querySelectorAll('.sql-line').forEach(line => line.classList.remove('active'));
+            document.querySelectorAll('.connection').forEach(conn => conn.classList.remove('active'));
+            document.querySelectorAll('.data-table').forEach(table => table.classList.remove('visible'));
+            
+            // Clear all highlights and filters
+            document.querySelectorAll('.table-row').forEach(row => {
+                row.classList.remove('highlighted', 'filtered-out');
+            });
+            
+            // Remove current-step class from all tables
+            document.querySelectorAll('.data-table').forEach(table => {
+                table.classList.remove('current-step');
+            });
+            
+            // Show tables for current step (cumulative)
+            if (step > 0 && stepTables[step]) {
+                stepTables[step].forEach((tableId, index) => {
+                    const table = document.getElementById(tableId);
+                    if (table) {
+                        setTimeout(() => {
+                            table.classList.add('visible');
+                            // Highlight the newest table in this step
+                            if (index === stepTables[step].length - 1) {
+                                table.classList.add('current-step');
+                            }
+                        }, 200 + index * 100);
+                    }
+                });
+            }
+
+            // Show final result indicator for step 8
+            const finalResult = document.getElementById('finalResult');
+            if (step === 8) {
+                setTimeout(() => {
+                    finalResult.style.opacity = '1';
+                }, 1000);
+            } else {
+                finalResult.style.opacity = '0';
+            }
+            
+            // Activate current step SQL line
+            document.querySelectorAll(`[data-step="${step}"]`).forEach(el => {
+                setTimeout(() => el.classList.add('active'), 400);
+            });
+            
+            // Show connections cumulatively
+            if (step > 0) {
+                for (let i = 1; i <= step; i++) {
+                    const connection = document.getElementById(`conn${i}`);
+                    if (connection) {
+                        // For step 2 (JOIN), show both conn1 and conn2 simultaneously
+                        if (step === 2 && (i === 1 || i === 2)) {
+                            setTimeout(() => connection.classList.add('active'), 600);
+                        } else {
+                            setTimeout(() => connection.classList.add('active'), 600 + (i - 1) * 100);
+                        }
+                    }
+                }
+            }
+            
+            // Special animations for specific steps
+            if (step === 3) {
+                // Animate filtering - highlight rows that pass the filter
+                setTimeout(() => {
+                    const joinedRows = document.querySelectorAll('#joinedTable .table-row');
+                    joinedRows.forEach((row, index) => {
+                        if (index > 0) { // Skip header
+                            const dateCell = row.children[2];
+                            if (dateCell && dateCell.textContent.includes('2022')) {
+                                row.classList.add('filtered-out');
+                            } else {
+                                row.classList.add('highlighted');
+                                setTimeout(() => row.classList.remove('highlighted'), 1000);
+                            }
+                        }
+                    });
+                }, 800);
+            }
+            
+            if (step === 4) {
+                // Animate grouping - show rows being combined
+                setTimeout(() => {
+                    const filteredRows = document.querySelectorAll('#filteredTable .table-row');
+                    filteredRows.forEach((row, index) => {
+                        if (index > 0) { // Skip header
+                            setTimeout(() => {
+                                row.classList.add('highlighted');
+                                setTimeout(() => row.classList.remove('highlighted'), 500);
+                            }, index * 200);
+                        }
+                    });
+                }, 600);
+            }
+            
+            if (step === 6) {
+                // Show filtering in having - highlight rows that pass
+                setTimeout(() => {
+                    const groupedRows = document.querySelectorAll('#groupedTable .table-row');
+                    groupedRows.forEach((row, index) => {
+                        if (index > 0) { // Skip header
+                            const totalCell = row.children[2];
+                            if (totalCell && parseInt(totalCell.textContent) < 600) {
+                                row.classList.add('filtered-out');
+                            } else {
+                                row.classList.add('highlighted');
+                                setTimeout(() => row.classList.remove('highlighted'), 1000);
+                            }
+                        }
+                    });
+                }, 800);
+            }
+            
+            if (step === 7) {
+                // Animate sorting
+                setTimeout(() => {
+                    const havingRows = document.querySelectorAll('#havingTable .table-row');
+                    havingRows.forEach((row, index) => {
+                        if (index > 0) { // Skip header
+                            setTimeout(() => {
+                                row.classList.add('highlighted');
+                                setTimeout(() => row.classList.remove('highlighted'), 500);
+                            }, index * 300);
+                        }
+                    });
+                }, 600);
+            }
+            
+            // Update button states
+            document.getElementById('prevBtn').disabled = step === 0;
+            document.getElementById('nextBtn').disabled = step === maxSteps;
+        }
+
+        function nextStep() {
+            if (currentStep < maxSteps) {
+                updateStep(currentStep + 1);
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 0) {
+                updateStep(currentStep - 1);
+            }
+        }
+
+        function resetAnimation() {
+            stopAutoPlay();
+            updateStep(0);
+        }
+
+        function toggleAutoPlay() {
+            if (autoPlaying) {
+                stopAutoPlay();
+            } else {
+                startAutoPlay();
+            }
+        }
+
+        function startAutoPlay() {
+            if (autoPlaying) return;
+            
+            autoPlaying = true;
+            document.getElementById('playBtn').innerHTML = '⏸️ Pause';
+            
+            // Reset to beginning if at end
+            if (currentStep >= maxSteps) {
+                resetAnimation();
+            }
+            
+            autoPlayInterval = setInterval(() => {
+                if (currentStep < maxSteps) {
+                    nextStep();
+                } else {
+                    stopAutoPlay();
+                }
+            }, 4000);
+        }
+
+        function stopAutoPlay() {
+            if (!autoPlaying) return;
+            
+            autoPlaying = false;
+            document.getElementById('playBtn').innerHTML = '▶️ Auto Play';
+            
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+            }
+        }
+
+        // Initialize
+        updateStep(0);
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextStep();
+            if (e.key === 'ArrowLeft') previousStep();
+            if (e.key === ' ') {
+                e.preventDefault();
+                toggleAutoPlay();
+            }
+            if (e.key === 'r' || e.key === 'R') resetAnimation();
+        });
+
+        // Pause auto play when window loses focus
+        window.addEventListener('blur', () => {
+            if (autoPlaying) stopAutoPlay();
+        });
+
+        // Pause auto play when hovering over tables for better inspection
+        document.querySelectorAll('.data-table').forEach(table => {
+            table.addEventListener('mouseenter', () => {
+                if (autoPlaying) {
+                    table.dataset.wasAutoPlaying = 'true';
+                    stopAutoPlay();
+                }
+            });
+            
+            table.addEventListener('mouseleave', () => {
+                if (table.dataset.wasAutoPlaying === 'true') {
+                    delete table.dataset.wasAutoPlaying;
+                    startAutoPlay();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
